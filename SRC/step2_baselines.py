@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -8,12 +9,10 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, mean_abs
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# ---------- Load cleaned dataset ----------
 CSV = "C:/Users/elyes/Downloads/beijing+pm2+5+data (1)/PRSA_data_2010.1.1-2014.12.31.csv"
 df = pd.read_csv(CSV)
 df = df[df['hour'].between(0,23)].copy()
 
-# label + features
 df['healthy'] = np.where(df['pm2.5'] < 75, 1, 0)
 df = df.dropna(subset=['pm2.5']).copy()
 
@@ -22,7 +21,7 @@ df['hour_cos']  = np.cos(2*np.pi*df['hour']/24.0)
 df['month_sin'] = np.sin(2*np.pi*df['month']/12.0)
 df['month_cos'] = np.cos(2*np.pi*df['month']/12.0)
 
-# --------- Train/Val/Test Split ---------
+#  Train/Val/Test Split
 X = df[['DEWP','TEMP','PRES','Iws','Is','Ir','hour_sin','hour_cos','month_sin','month_cos']]
 y_class = df['healthy']
 y_reg = df['pm2.5']
@@ -34,7 +33,7 @@ X_valid, X_test, y_class_valid, y_class_test, y_reg_valid, y_reg_test = train_te
     X_temp, y_class_temp, y_reg_temp, test_size=0.5, random_state=42
 )
 
-# --------- Classification Models ---------
+# These are our Classification Models
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_valid_scaled = scaler.transform(X_valid)
@@ -54,7 +53,6 @@ for name, model in models_clf.items():
     clf_metrics.append([name, acc, f1])
     print(f"{name}: Accuracy={acc:.3f}, F1={f1:.3f}")
 
-# Confusion matrix for best classifier
 best_clf_name = max(clf_metrics, key=lambda x: x[1])[0]
 best_clf = models_clf[best_clf_name]
 y_pred_best = best_clf.predict(X_test_scaled)
@@ -68,7 +66,7 @@ plt.tight_layout()
 plt.savefig("plot3_confusion_matrix.png")
 plt.show()
 
-# --------- Regression Models ---------
+# These are our Regression Models
 reg_models = {
     'Linear Regression': LinearRegression(),
     'Decision Tree Regressor': DecisionTreeRegressor(max_depth=10, random_state=42)
@@ -79,11 +77,11 @@ for name, model in reg_models.items():
     model.fit(X_train_scaled, y_reg_train)
     y_pred = model.predict(X_test_scaled)
     mae = mean_absolute_error(y_reg_test, y_pred)
-    rmse = mean_squared_error(y_reg_test, y_pred, squared=False)
+    rmse = np.sqrt(mean_squared_error(y_reg_test, y_pred))
     reg_metrics.append([name, mae, rmse])
     print(f"{name}: MAE={mae:.2f}, RMSE={rmse:.2f}")
 
-# Residuals plot for best regressor
+
 best_reg_name = min(reg_metrics, key=lambda x: x[1])[0]
 best_reg = reg_models[best_reg_name]
 y_pred_reg = best_reg.predict(X_test_scaled)
@@ -98,6 +96,25 @@ plt.tight_layout()
 plt.savefig("plot4_residuals_vs_predicted.png")
 plt.show()
 
-# --------- Save Metrics for Tables ---------
 pd.DataFrame(clf_metrics, columns=['Model','Accuracy','F1']).to_csv("table1_classification_metrics.csv", index=False)
 pd.DataFrame(reg_metrics, columns=['Model','MAE','RMSE']).to_csv("table2_regression_metrics.csv", index=False)
+
+# We performed these tests to confirm that our models are not overfitting, underfitting, or producing random results.
+
+# Classification overfitting check
+# We compare Logistic Regression accuracy on the training vs test set.
+y_pred_train = log_reg.predict(X_train_scaled)
+train_acc = accuracy_score(y_class_train, y_pred_train)
+print(f"[Train vs Test] Logistic Regression Acc: {train_acc:.3f} (train) vs {acc:.3f} (test)")
+
+# Regression overfitting check
+# We compare Decision Tree Regressor’s MAE (Mean Absolute Error)
+y_pred_train_reg = reg_models['Decision Tree Regressor'].predict(X_train_scaled)
+train_mae = mean_absolute_error(y_reg_train, y_pred_train_reg)
+print(f"[Train vs Test] Decision Tree MAE: {train_mae:.2f} (train) vs {mae:.2f} (test)")
+
+# 5-Fold Cross-Validation splits the data into 5 parts,
+from sklearn.model_selection import cross_val_score
+cv_acc = cross_val_score(LogisticRegression(max_iter=5000),
+                         X, y_class, cv=5, scoring='accuracy')
+print(f"5-Fold Logistic Regression Acc: {cv_acc.mean():.3f} ± {cv_acc.std():.3f}")

@@ -1,41 +1,35 @@
-import pandas as pd, numpy as np, matplotlib.pyplot as plt, seaborn as sns
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet
 
-import sklearn
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+doc = SimpleDocTemplate("midpoint_AirQuality2.pdf", pagesize=letter)
+styles = getSampleStyleSheet()
+story = []
 
-# ... (same data prep as above) ...
+story.append(Paragraph("<b>CS-4120 Midpoint Report — AirQuality2</b>", styles['Title']))
+story.append(Spacer(1, 12))
+story.append(Paragraph("Team: AirQuality2<br/>Dataset: Beijing PM2.5 (UCI)", styles['Normal']))
+story.append(Spacer(1, 12))
 
-candidates = {
-    "LogisticRegression": Pipeline([("scaler", StandardScaler(with_mean=False)),
-                                    ("clf", LogisticRegression(max_iter=1000))]),
-    "DecisionTreeClassifier": Pipeline([("scaler", StandardScaler(with_mean=False)),
-                                        ("clf", DecisionTreeClassifier(max_depth=10, random_state=42))]),
-}
+# Text sections
+story.append(Paragraph("<b>Updated Dataset Description</b>", styles['Heading2']))
+story.append(Paragraph("43,824 hourly records ... cyclic hour/month features added.", styles['BodyText']))
+story.append(Paragraph("<b>EDA Summary</b>", styles['Heading2']))
+story.append(Paragraph("Classes are balanced ... correlations show TEMP and DEWP negatively correlated with PM2.5.", styles['BodyText']))
 
-scores = {}
-for name, pipe in candidates.items():
-    pipe.fit(X_tr, y_tr)
-    pred_va = pipe.predict(X_va)
-    scores[name] = dict(acc=accuracy_score(y_va, pred_va), f1=f1_score(y_va, pred_va))
-    print(f"{name}  valid: acc={scores[name]['acc']:.3f}, f1={scores[name]['f1']:.3f}")
+# Add plots
+for plot in ["plot1_target_distribution.png","plot2_correlation_heatmap.png",
+             "plot3_confusion_matrix.png","plot4_residuals_vs_predicted.png"]:
+    try:
+        story.append(Image(plot, width=350, height=250))
+        story.append(Spacer(1,12))
+    except Exception:
+        pass
 
-best_name = max(scores, key=lambda k: scores[k]['f1'])
-best_model = candidates[best_name]
-pred_te = best_model.predict(X_te)
+story.append(Paragraph("<b>Baseline Results & Discussion</b>", styles['Heading2']))
+story.append(Paragraph("Logistic Regression achieved 0.77 accuracy ... Decision Tree Regressor MAE≈46 RMSE≈68.", styles['BodyText']))
+story.append(Paragraph("<b>Neural Network Plan</b>", styles['Heading2']))
+story.append(Paragraph("We will implement two MLPs ...", styles['BodyText']))
 
-print(f"\nBEST: {best_name}  test acc={accuracy_score(y_te, pred_te):.3f}, test f1={f1_score(y_te, pred_te):.3f}")
-
-cm = confusion_matrix(y_te, pred_te)
-plt.figure(figsize=(5,4))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-plt.title(f"Plot 3: Confusion Matrix ({best_name})")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.tight_layout()
-plt.savefig("plot3_confusion_matrix.png")
-plt.show()
+doc.build(story)
+print("✅ midpoint_AirQuality2.pdf created")
